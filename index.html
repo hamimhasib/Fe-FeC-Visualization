@@ -1,0 +1,350 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Definitive Fe-Fe3C Microstructure Generator</title>
+    <style>
+        body {
+            font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            gap: 30px;
+            background-color: #f0f2f5;
+            margin: 20px;
+        }
+        .main-container {
+            display: flex;
+            gap: 30px;
+            flex-wrap: wrap;
+            justify-content: center;
+            max-width: 1400px;
+        }
+        .interactive-tool, .reference-diagram-container {
+            padding: 20px;
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.1);
+        }
+        .interactive-tool {
+            display: flex;
+            gap: 40px;
+            flex-wrap: wrap;
+            justify-content: center;
+        }
+        h2, h3 {
+            margin-top: 0;
+            color: #333;
+            border-bottom: 2px solid #eee;
+            padding-bottom: 10px;
+        }
+        .slider-group {
+            margin-bottom: 20px;
+        }
+        label {
+            font-weight: bold;
+            color: #555;
+        }
+        input[type="range"] {
+            width: 300px;
+        }
+        #microstructureCanvas {
+            width: 300px;
+            height: 300px;
+            border: 2px solid #ccc;
+            background: #eee;
+        }
+        .reference-diagram-container {
+            width: 600px;
+            height: 500px;
+        }
+        .legend {
+            margin-top: 20px;
+            padding-top: 15px;
+            border-top: 2px solid #eee;
+        }
+        .legend h3 {
+            border: none;
+            padding: 0;
+            margin-bottom: 10px;
+        }
+        .legend ul {
+            list-style: none;
+            padding: 0;
+            margin: 0;
+        }
+        .legend li {
+            display: flex;
+            align-items: center;
+            margin-bottom: 8px;
+            font-size: 14px;
+        }
+        .legend-icon {
+            flex-shrink: 0;
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            margin-right: 10px;
+            border-radius: 50%;
+            border: 1px solid #555;
+        }
+        .legend-icon.liquid { background-color: #ff6961; }
+        .legend-icon.austenite { background-color: #a5b4fc; }
+        .legend-icon.ferrite { background-color: #cccccc; }
+        .legend-icon.pearlite { background: repeating-linear-gradient(45deg, #ccc, #ccc 2px, #333 2px, #333 4px); }
+        .legend-icon.ledeburite { background-image: radial-gradient(circle, #a5b4fc 20%, #666 80%); }
+        .legend-icon.cementite { border: 3px solid #333; outline: 1px solid #555; background-color: transparent; }
+        .copyright {
+            margin-top: 20px;
+            font-size: 12px;
+            color: #888;
+            text-align: center;
+        }
+
+        /* --- NEW: Responsive Design for Smartphones --- */
+        @media (max-width: 768px) {
+            body {
+                margin: 10px;
+                gap: 15px;
+            }
+            .main-container {
+                flex-direction: column;
+                gap: 15px;
+            }
+            .interactive-tool {
+                flex-direction: column;
+                gap: 20px;
+            }
+            .reference-diagram-container {
+                width: 90vw; /* Use viewport width */
+                height: 80vw; /* Adjust height based on width */
+                max-height: 450px;
+            }
+            input[type="range"] {
+                width: 100%; /* Make sliders fill their container */
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="main-container">
+        <div class="interactive-tool">
+            <div class="controls">
+                <h2>Interactive Controls</h2>
+                <div class="slider-group">
+                    <label for="carbonSlider">Carbon Content (%C): <span id="carbonValue">0.40</span>%</label><br>
+                    <input type="range" id="carbonSlider" min="0" max="6.67" step="0.01" value="0.40">
+                </div>
+                <div class="slider-group">
+                    <label for="tempSlider">Temperature (°C): <span id="tempValue">950</span>°C</label><br>
+                    <input type="range" id="tempSlider" min="20" max="1600" step="5" value="950">
+                </div>
+            </div>
+            <div class="display">
+                <h2>Generated Microstructure</h2>
+                <canvas id="microstructureCanvas" width="300" height="300"></canvas>
+                <div class="legend">
+                    <h3>Microstructure Legend</h3>
+                    <ul>
+                         <li><span class="legend-icon liquid"></span> Liquid (L)</li>
+                        <li><span class="legend-icon austenite"></span> Austenite ($\gamma$) Grain</li>
+                        <li><span class="legend-icon ferrite"></span> Ferrite ($\alpha$) Grain</li>
+                        <li><span class="legend-icon pearlite"></span> Pearlite Colony ($\alpha$ + Fe₃C)</li>
+                        <li><span class="legend-icon ledeburite"></span> Ledeburite (Eutectic)</li>
+                        <li><span class="legend-icon cementite"></span> Cementite (Fe₃C) Boundary</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+
+        <div class="reference-diagram-container">
+            <canvas id="referenceChartCanvas"></canvas>
+        </div>
+    </div>
+
+    <div class="copyright">
+        © 2025 Md. Hasibur Rahman Hamim, Junior Lecturer, MPE, IUT
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-annotation@3.0.1/dist/chartjs-plugin-annotation.min.js"></script>
+
+    <script>
+    document.addEventListener('DOMContentLoaded', () => {
+        // --- Get all DOM elements ---
+        const carbonSlider = document.getElementById('carbonSlider');
+        const tempSlider = document.getElementById('tempSlider');
+        const carbonValue = document.getElementById('carbonValue');
+        const tempValue = document.getElementById('tempValue');
+        const microstructureCanvas = document.getElementById('microstructureCanvas');
+        const microstructureCtx = microstructureCanvas.getContext('2d');
+        const referenceCanvas = document.getElementById('referenceChartCanvas');
+
+        // --- Phase Boundary Data ---
+        const eutectoid_C = 0.76, eutectoid_T = 727;
+        const eutectic_C = 4.3, eutectic_T = 1147;
+        const peritectic_C = 0.16, peritectic_T = 1493;
+        const max_sol_C = 2.11;
+        const liquidusLine = [{x:0, y:1538}, {x:peritectic_C, y:peritectic_T}, {x:eutectic_C, y:eutectic_T}, {x:6.67, y:1320}];
+        const solidusLine = [{x:0, y:1538}, {x:0.1,y:1493}, {x:max_sol_C, y:eutectic_T}, {x:6.67, y:1147}];
+        const peritecticLine = [{x:0.1, y:peritectic_T}, {x:0.53, y:peritectic_T}];
+        const a3Line = [{x:0, y:912}, {x:eutectoid_C, y:eutectoid_T}];
+        const acmLine = [{x:eutectoid_C, y:eutectoid_T}, {x:max_sol_C, y:eutectic_T}];
+        const a1Line = [{x:0.022, y:eutectoid_T}, {x:6.67, y:eutectoid_T}];
+        const a0Line = [{x:0, y:770}, {x:eutectoid_C, y:770}];
+        
+        // --- Setup for the Reference Chart ---
+        const referenceChart = new Chart(referenceCanvas, {
+            type: 'scatter',
+            data: {
+                datasets: [
+                    { data: liquidusLine, showLine: true, borderColor: 'red', borderWidth: 2, pointRadius: 0, fill: false },
+                    { data: solidusLine, showLine: true, borderColor: 'blue', borderWidth: 2, pointRadius: 0, fill: false },
+                    { data: peritecticLine, showLine: true, borderColor: 'brown', borderWidth: 2, pointRadius: 0, fill: false },
+                    { data: a3Line, showLine: true, borderColor: 'green', borderWidth: 2, pointRadius: 0, fill: false },
+                    { data: acmLine, showLine: true, borderColor: 'purple', borderWidth: 2, pointRadius: 0, fill: false },
+                    { data: a1Line, showLine: true, borderColor: 'orange', borderWidth: 2, pointRadius: 0, fill: false, borderDash: [5, 5] },
+                    { data: a0Line, showLine: true, borderColor: 'grey', borderWidth: 1.5, pointRadius: 0, fill: false, borderDash: [2, 2] },
+                ]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                scales: {
+                    x: { type: 'linear', position: 'bottom', title: { display: true, text: 'Carbon Weight %' }, min: 0, max: 6.67 },
+                    y: { type: 'linear', title: { display: true, text: 'Temperature (°C)' }, min: 400, max: 1600 }
+                },
+                plugins: {
+                    title: { display: true, text: 'Reference Fe-Fe3C Diagram', font: { size: 16 } },
+                    legend: { display: false },
+                    annotation: {
+                        annotations: {
+                            point: {
+                                type: 'point',
+                                xValue: 0.4, yValue: 950,
+                                backgroundColor: 'rgba(255, 20, 30, 0.9)',
+                                radius: 6,
+                                borderColor: 'rgba(255, 255, 255, 1)',
+                                borderWidth: 1.5,
+                                enter(ctx, event) {
+                                    ctx.chart.options.plugins.annotation.annotations.tooltipLabel.display = true;
+                                    ctx.chart.update('none');
+                                },
+                                leave(ctx, event) {
+                                    ctx.chart.options.plugins.annotation.annotations.tooltipLabel.display = false;
+                                    ctx.chart.update('none');
+                                }
+                            },
+                            tooltipLabel: {
+                                type: 'label',
+                                xValue: 0.4, yValue: 950,
+                                content: ['Current Point'],
+                                font: { size: 12, weight: 'bold' },
+                                backgroundColor: 'rgba(0, 0, 0, 0.7)',
+                                color: 'white',
+                                yAdjust: -25,
+                                display: false
+                            },
+                            austeniteLabel: { type: 'label', xValue: 1, yValue: 900, content: 'Austenite (γ)', font: {size: 14}, color: 'rgba(0,0,0,0.6)' },
+                            ferriteLabel: { type: 'label', xValue: 0.2, yValue: 600, content: 'Ferrite + Pearlite', font: {size: 12}, color: 'rgba(0,0,0,0.6)', rotation: -90},
+                            liquidLabel: { type: 'label', xValue: 2.5, yValue: 1500, content: 'Liquid (L)', font: {size: 14}, color: 'rgba(0,0,0,0.6)' },
+                            cementiteLabel: { type: 'label', xValue: 5.5, yValue: 900, content: 'Austenite + Cementite', font: {size: 12}, color: 'rgba(0,0,0,0.6)', rotation: 90},
+                        }
+                    }
+                }
+            }
+        });
+
+        // --- Helper Function ---
+        function findTempOnLine(carbon, lineData) {
+            for (let i = 0; i < lineData.length - 1; i++) {
+                const p1 = lineData[i], p2 = lineData[i + 1];
+                if (carbon >= p1.x && carbon <= p2.x) {
+                    return p1.y + (p2.y - p1.y) * (carbon - p1.x) / (p2.x - p1.x);
+                }
+            }
+            return null;
+        }
+
+        // --- Drawing Engine ---
+        function drawMicrostructure(params) {
+            const ctx = microstructureCtx; const width = microstructureCanvas.width; const height = microstructureCanvas.height;
+            ctx.clearRect(0, 0, width, height);
+            const morphology = params.morphology; const grainSize = params.grain_size || 50;
+            const numGrains = Math.floor((width / grainSize) ** 2);
+            const points = Array.from({ length: numGrains }, () => ({ x: Math.random() * width, y: Math.random() * height, radius: grainSize / 2 + (Math.random() - 0.5) * 10 }));
+            const drawGrains = (color, pointsToDraw) => pointsToDraw.forEach(p => { ctx.beginPath(); ctx.arc(p.x, p.y, p.radius, 0, Math.PI * 2); ctx.fillStyle = color; ctx.fill(); ctx.strokeStyle = '#555'; ctx.stroke(); });
+            const drawLamellarPattern = (colony) => { ctx.save(); ctx.beginPath(); ctx.arc(colony.x, colony.y, colony.radius, 0, Math.PI * 2); ctx.clip(); for (let i = -colony.radius; i < colony.radius; i += 4) { ctx.beginPath(); ctx.moveTo(colony.x + i, colony.y - colony.radius); ctx.lineTo(colony.x + i, colony.y + colony.radius); ctx.strokeStyle = (i % 8 === 0) ? '#333' : '#ccc'; ctx.stroke(); } ctx.restore(); };
+            const drawLedeburite = () => { ctx.fillStyle = '#666'; ctx.fillRect(0, 0, width, height); points.forEach(p => { const grd = ctx.createRadialGradient(p.x, p.y, 2, p.x, p.y, p.radius); grd.addColorStop(0, '#a5b4fc'); grd.addColorStop(1, '#666'); ctx.beginPath(); ctx.arc(p.x, p.y, p.radius, 0, Math.PI * 2); ctx.fillStyle = grd; ctx.fill(); }); };
+            switch (morphology) {
+                case 'liquid': ctx.fillStyle = '#ff6961'; ctx.fillRect(0, 0, width, height); break;
+                case 'austenite': drawGrains('#a5b4fc', points); break;
+                case 'ferrite': drawGrains('#cccccc', points); break;
+                case 'lamellar': points.forEach(p => drawLamellarPattern(p)); break;
+                case 'austenite_plus_liquid': ctx.fillStyle = '#ff6961'; ctx.fillRect(0, 0, width, height); drawGrains('#a5b4fc', points.slice(0, Math.floor(numGrains * params.ratio))); break;
+                case 'ferrite_plus_austenite': points.forEach((p, index) => { if (index / numGrains < params.ratio) drawGrains('#cccccc', [p]); else drawGrains('#a5b4fc', [p]); }); break;
+                case 'hypoeutectoid': points.forEach((p, index) => { if (index / numGrains < params.ratio) drawGrains('#cccccc', [p]); else drawLamellarPattern(p); }); break;
+                case 'austenite_plus_cementite': drawGrains('#a5b4fc', points); points.forEach(p => { ctx.beginPath(); ctx.arc(p.x, p.y, p.radius, 0, Math.PI * 2); ctx.strokeStyle = '#333'; ctx.lineWidth = 3; ctx.stroke(); }); ctx.lineWidth = 1; break;
+                case 'hypereutectoid': points.forEach(p => drawLamellarPattern(p)); points.forEach(p => { ctx.beginPath(); ctx.arc(p.x, p.y, p.radius, 0, Math.PI * 2); ctx.strokeStyle = '#333'; ctx.lineWidth = 2.5; ctx.stroke(); }); ctx.lineWidth = 1; break;
+                case 'ledeburite': drawLedeburite(); break;
+                default: ctx.fillStyle = '#f0f0f0'; ctx.fillRect(0, 0, width, height); break;
+            }
+        }
+
+        // --- Scientific Logic ---
+        function getVisualParameters(c, t) {
+            c = parseFloat(c); t = parseFloat(t);
+            const liquidusTemp = findTempOnLine(c, liquidusLine);
+            const solidusTemp = findTempOnLine(c, solidusLine);
+            const a3Temp = findTempOnLine(c, a3Line);
+            const acmTemp = findTempOnLine(c, acmLine);
+            if (t >= liquidusTemp) return { morphology: 'liquid', name: 'Liquid' };
+            if (t > solidusTemp) return { morphology: 'austenite_plus_liquid', ratio: (liquidusTemp - t) / (liquidusTemp - solidusTemp), name: 'L + Austenite' };
+            if (t <= solidusTemp) {
+                if (t > eutectoid_T) {
+                    if (c > max_sol_C) return { morphology: 'austenite_plus_cementite', name: 'Austenite + Cementite' };
+                    if (c < eutectoid_C && t < a3Temp) return { morphology: 'ferrite_plus_austenite', ratio: 0.5, name: 'Ferrite + Austenite' };
+                    if (c > eutectoid_C && t < acmTemp) return { morphology: 'austenite_plus_cementite', name: 'Austenite + Cementite' };
+                    return { morphology: 'austenite', name: 'Austenite' };
+                } else {
+                    if (c > max_sol_C) {
+                        if (c < eutectic_C) return { morphology: 'ledeburite', name: 'Pearlite + Ledeburite' };
+                        return { morphology: 'hypereutectoid', name: 'Pearlite + Cementite' };
+                    }
+                    if (c < 0.022) return { morphology: 'ferrite', name: 'Ferrite' };
+                    if (c < eutectoid_C) return { morphology: 'hypoeutectoid', ratio: (eutectoid_C - c) / eutectoid_C, name: 'Ferrite + Pearlite' };
+                    if (c < 0.8) return { morphology: 'lamellar', name: 'Pearlite' };
+                    return { morphology: 'hypereutectoid', name: 'Pearlite + Cementite' };
+                }
+            }
+            return { morphology: 'default', name: 'N/A' };
+        }
+        
+        // --- Main Update Function ---
+        function update() {
+            const carbon = carbonSlider.value;
+            const temp = tempSlider.value;
+            carbonValue.textContent = parseFloat(carbon).toFixed(2);
+            tempValue.textContent = temp;
+            const visualParams = getVisualParameters(carbon, temp);
+            drawMicrostructure(visualParams);
+            const annotations = referenceChart.options.plugins.annotation.annotations;
+            annotations.point.xValue = carbon;
+            annotations.point.yValue = temp;
+            annotations.tooltipLabel.xValue = carbon;
+            annotations.tooltipLabel.yValue = temp;
+            annotations.tooltipLabel.content = [visualParams.name];
+            annotations.tooltipLabel.xAdjust = (carbon > 5.5) ? -50 : 0;
+            referenceChart.update('none');
+        }
+
+        carbonSlider.addEventListener('input', update);
+        tempSlider.addEventListener('input', update);
+        update();
+    });
+    </script>
+</body>
+</html>
